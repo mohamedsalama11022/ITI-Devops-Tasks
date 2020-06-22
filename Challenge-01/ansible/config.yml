@@ -1,0 +1,90 @@
+---
+- hosts: web
+  remote_user: ec2-user
+  become: true
+  
+  tasks:
+    - name: upgrade all packages
+      yum:
+        name: '*'
+        state: latest
+
+    - name: install docker
+      yum:
+        name: docker
+    - name: start docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: get url
+      shell: echo https://github.com/docker/compose/releases/download/1.26.0/docker-compose-$(uname -s)-$(uname -m)
+      register: version
+
+    - name: install docker compose
+      get_url:
+        url: "{{ version.stdout }}"
+        dest: /usr/local/bin/docker-compose
+        mode: '777'
+    - name: enable epel release
+      shell: yum-config-manager --enable epel
+
+
+    - name: install pip
+      yum:
+        name: python-pip
+
+    - name: install git
+      yum:
+        name: git
+
+    - pip:
+        name:
+          - docker-py        
+
+    - name: add ec2-user to the docker group
+      user:
+        name: ec2-user
+        shell: /bin/bash
+        groups: docker
+        append: yes
+
+    - name: Restart docker service
+      systemd:
+        name: docker
+        state: reloaded
+        enabled: yes
+    
+    - name: install java
+      yum:
+        name: java-1.8.0-openjdk
+
+    - name: download jenkins
+      get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo 
+        mode: '0777'
+
+    - name: add key
+      rpm_key:
+        state: present
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+
+    - name: install jenkins
+      yum:
+        name: jenkins
+
+    - name: start jenkins service
+      systemd:
+        name: jenkins
+        state: started
+        enabled: yes
+    
+    - name: add jenkins to the docker group
+      user:
+        name: jenkins
+        shell: /bin/bash
+        groups: docker
+        append: yes
+        
